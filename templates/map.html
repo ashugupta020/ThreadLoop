@@ -1,0 +1,786 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ThreadLoop | Recovery Map</title>
+
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+
+    <style>
+        :root {
+            --green: #245c45;
+            --green-light: #e8f1e9;
+            --cream: #f8f7ef;
+            --text: #263b30;
+            --muted: #68766c;
+            --border: #dce5dc;
+            --white: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: var(--cream);
+            color: var(--text);
+        }
+
+        header {
+            background: var(--green);
+            color: white;
+            padding: 20px 6%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 25px;
+        }
+
+        header a {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            margin: 28px auto;
+        }
+
+        .intro {
+            margin-bottom: 22px;
+        }
+
+        .intro h2 {
+            margin-bottom: 8px;
+            font-size: 29px;
+        }
+
+        .intro p {
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .search-panel {
+            display: grid;
+            grid-template-columns: minmax(180px, 2fr) minmax(160px, 1fr);
+            gap: 12px;
+            margin: 20px 0;
+        }
+
+        input,
+        select,
+        button {
+            width: 100%;
+            padding: 13px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            font-size: 15px;
+        }
+
+        input,
+        select {
+            background: white;
+            color: var(--text);
+        }
+
+        .buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        button {
+            width: auto;
+            cursor: pointer;
+            font-weight: bold;
+            border: none;
+            background: var(--green);
+            color: white;
+        }
+
+        button.secondary {
+            background: #e5eee5;
+            color: var(--green);
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        #status {
+            color: var(--muted);
+            margin: 14px 0;
+            line-height: 1.5;
+        }
+
+        .notice {
+            background: #fff7df;
+            border: 1px solid #eadcae;
+            padding: 14px;
+            border-radius: 10px;
+            line-height: 1.6;
+            margin: 18px 0;
+            font-size: 14px;
+        }
+
+        .results-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+            gap: 20px;
+            align-items: start;
+        }
+
+        #map {
+            height: 520px;
+            width: 100%;
+            border-radius: 15px;
+            border: 1px solid var(--border);
+            z-index: 1;
+        }
+
+        .results-heading {
+            margin: 0 0 12px;
+        }
+
+        #results {
+            display: grid;
+            gap: 12px;
+        }
+
+        .place-card {
+            background: white;
+            padding: 16px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+
+        .place-card h3 {
+            margin: 0 0 8px;
+            font-size: 17px;
+        }
+
+        .place-card p {
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.5;
+            margin: 7px 0;
+            overflow-wrap: anywhere;
+        }
+
+        .tag {
+            display: inline-block;
+            background: var(--green-light);
+            color: var(--green);
+            border-radius: 20px;
+            padding: 5px 9px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 7px;
+        }
+
+        .tag.warning {
+            background: #fff0d4;
+            color: #805415;
+        }
+
+        .directions {
+            display: inline-block;
+            margin-top: 8px;
+            color: var(--green);
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        .directions:hover {
+            text-decoration: underline;
+        }
+
+        .empty {
+            background: white;
+            border: 1px dashed var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        @media (max-width: 760px) {
+            .results-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .search-panel {
+                grid-template-columns: 1fr;
+            }
+
+            #map {
+                height: 380px;
+            }
+
+            .intro h2 {
+                font-size: 25px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>🌿 ThreadLoop</h1>
+        <a href="/">← Back to Home</a>
+    </header>
+
+    <main class="container">
+        <section class="intro">
+            <h2>Find a garment's next destination</h2>
+            <p>
+                Explore mapped recycling points, clothing alteration services,
+                and potential second-hand shops near your area.
+            </p>
+        </section>
+
+        <div class="search-panel">
+            <input
+                id="areaInput"
+                type="text"
+                placeholder="Enter your area or city (e.g. Jaipur)"
+                aria-label="Area or city"
+            />
+
+            <select id="categoryInput" aria-label="Choose a category">
+                <option value="all">All locations</option>
+                <option value="recycling">Recycling</option>
+                <option value="repair">Repair / tailoring</option>
+                <option value="resale">Resale leads</option>
+            </select>
+        </div>
+
+        <div class="buttons">
+            <button id="searchButton" onclick="searchPlaces()">
+                Search Locations
+            </button>
+
+            <button
+                class="secondary"
+                id="locationButton"
+                onclick="useMyLocation()"
+            >
+                Use My Location
+            </button>
+        </div>
+
+        <p id="status" role="status">
+            Enter an area and select Search Locations to begin.
+        </p>
+
+        <div class="notice">
+            <strong>Important:</strong> Locations come from OpenStreetMap and
+            are not verified ThreadLoop partners. A tailor may not offer every
+            repair service, a clothing shop may not sell second-hand garments,
+            and a recycling point may not accept textiles. Please confirm
+            directly before visiting or handing over a garment.
+        </div>
+
+        <section class="results-layout">
+            <div id="map" aria-label="Map of nearby locations"></div>
+
+            <div>
+                <h2 class="results-heading">Nearby locations</h2>
+                <div id="results">
+                    <div class="empty">
+                        Search for an area to see mapped locations here.
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        const map = L.map("map").setView([26.9124, 75.7873], 11);
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        let markers = [];
+        let searchCenterMarker = null;
+
+        const statusElement = document.getElementById("status");
+        const resultsElement = document.getElementById("results");
+        const areaInput = document.getElementById("areaInput");
+        const categoryInput = document.getElementById("categoryInput");
+        const searchButton = document.getElementById("searchButton");
+        const locationButton = document.getElementById("locationButton");
+
+        function escapeHtml(value) {
+            return String(value ?? "").replace(/[&<>"']/g, function (char) {
+                const entities = {
+                    "&": "&amp;",
+                    "<": "&lt;",
+                    ">": "&gt;",
+                    '"': "&quot;",
+                    "'": "&#039;"
+                };
+
+                return entities[char];
+            });
+        }
+
+        function setLoading(isLoading) {
+            searchButton.disabled = isLoading;
+            locationButton.disabled = isLoading;
+
+            searchButton.textContent = isLoading
+                ? "Searching..."
+                : "Search Locations";
+        }
+
+        function clearMarkers() {
+            markers.forEach(function (marker) {
+                map.removeLayer(marker);
+            });
+
+            markers = [];
+        }
+
+        function getCoordinates(element) {
+            if (element.type === "node") {
+                return {
+                    lat: element.lat,
+                    lon: element.lon
+                };
+            }
+
+            if (element.center) {
+                return {
+                    lat: element.center.lat,
+                    lon: element.center.lon
+                };
+            }
+
+            return null;
+        }
+
+        function classifyPlace(tags, selectedCategory) {
+            if (
+                tags["recycling:clothes"] === "yes" ||
+                tags["recycling:clothing"] === "yes"
+            ) {
+                return {
+                    category: "recycling",
+                    label: "Clothing recycling tagged",
+                    verified: false,
+                    note: "Textile acceptance and current operating details need confirmation."
+                };
+            }
+
+            if (tags.amenity === "recycling") {
+                return {
+                    category: "recycling",
+                    label: "General recycling point",
+                    verified: false,
+                    note: "Clothing or textile acceptance is not confirmed."
+                };
+            }
+
+            if (
+                tags.shop === "tailor" ||
+                tags.craft === "tailor" ||
+                tags.shop === "sewing"
+            ) {
+                return {
+                    category: "repair",
+                    label: "Tailor / clothing alteration lead",
+                    verified: false,
+                    note: "Contact the business to confirm whether it repairs or alters garments."
+                };
+            }
+
+            if (tags.shop === "second_hand") {
+                return {
+                    category: "resale",
+                    label: "Second-hand shop (mapped)",
+                    verified: false,
+                    note: "Second-hand status is mapped, but clothing selection and current services need confirmation."
+                };
+            }
+
+            if (tags.shop === "clothes") {
+                return {
+                    category: "resale",
+                    label: "Clothing retailer — resale unconfirmed",
+                    verified: false,
+                    note: "This is a clothing shop, not a confirmed second-hand or resale service."
+                };
+            }
+
+            return {
+                category: selectedCategory,
+                label: "Mapped location",
+                verified: false,
+                note: "Please confirm the location's services before visiting."
+            };
+        }
+
+        function buildOverpassQuery(lat, lon, selected) {
+            const filters = [];
+
+            if (selected === "all" || selected === "recycling") {
+                filters.push(
+                    'node(around:7000,' + lat + ',' + lon + ')["recycling:clothes"="yes"];',
+                    'way(around:7000,' + lat + ',' + lon + ')["recycling:clothes"="yes"];',
+                    'node(around:7000,' + lat + ',' + lon + ')["recycling:clothing"="yes"];',
+                    'way(around:7000,' + lat + ',' + lon + ')["recycling:clothing"="yes"];',
+                    'node(around:7000,' + lat + ',' + lon + ')["amenity"="recycling"];',
+                    'way(around:7000,' + lat + ',' + lon + ')["amenity"="recycling"];'
+                );
+            }
+
+            if (selected === "all" || selected === "repair") {
+                filters.push(
+                    'node(around:7000,' + lat + ',' + lon + ')["shop"="tailor"];',
+                    'way(around:7000,' + lat + ',' + lon + ')["shop"="tailor"];',
+                    'node(around:7000,' + lat + ',' + lon + ')["craft"="tailor"];',
+                    'way(around:7000,' + lat + ',' + lon + ')["craft"="tailor"];',
+                    'node(around:7000,' + lat + ',' + lon + ')["shop"="sewing"];',
+                    'way(around:7000,' + lat + ',' + lon + ')["shop"="sewing"];'
+                );
+            }
+
+            if (selected === "all" || selected === "resale") {
+                filters.push(
+                    'node(around:7000,' + lat + ',' + lon + ')["shop"="second_hand"];',
+                    'way(around:7000,' + lat + ',' + lon + ')["shop"="second_hand"];',
+                    'node(around:7000,' + lat + ',' + lon + ')["shop"="clothes"];',
+                    'way(around:7000,' + lat + ',' + lon + ')["shop"="clothes"];'
+                );
+            }
+
+            return "[out:json][timeout:25];(" +
+                filters.join("") +
+                ");out center tags;";
+        }
+
+        async function geocodeArea(area) {
+            const url =
+                "https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" +
+                encodeURIComponent(area);
+
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                throw new Error("The area search service is temporarily unavailable.");
+            }
+
+            const data = await response.json();
+
+            if (!data.length) {
+                throw new Error("We couldn't find that area. Try a nearby city or a more specific location.");
+            }
+
+            return {
+                lat: Number(data[0].lat),
+                lon: Number(data[0].lon),
+                name: data[0].display_name
+            };
+        }
+
+        async function fetchPlaces(lat, lon, selected) {
+            const query = buildOverpassQuery(lat, lon, selected);
+            const endpoints = [
+                "https://overpass-api.de/api/interpreter",
+                "https://overpass.kumi.systems/api/interpreter"
+            ];
+
+            let lastError;
+
+            for (const endpoint of endpoints) {
+                try {
+                    const response = await fetch(endpoint, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+                        },
+                        body: "data=" + encodeURIComponent(query)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error("The map data service returned an error.");
+                    }
+
+                    const data = await response.json();
+                    return data.elements || [];
+                } catch (error) {
+                    lastError = error;
+                }
+            }
+
+            throw lastError || new Error("Unable to load map locations.");
+        }
+
+        function getPlaceName(tags) {
+            return tags.name ||
+                tags.brand ||
+                tags.operator ||
+                "Unnamed mapped location";
+        }
+
+        function renderPlaces(elements, lat, lon, selected) {
+            clearMarkers();
+
+            const seen = new Set();
+            const places = [];
+
+            elements.forEach(function (element) {
+                const tags = element.tags || {};
+                const coordinates = getCoordinates(element);
+
+                if (!coordinates) {
+                    return;
+                }
+
+                const classification = classifyPlace(tags, selected);
+
+                if (selected !== "all" && classification.category !== selected) {
+                    return;
+                }
+
+                const key = coordinates.lat.toFixed(5) + "," +
+                    coordinates.lon.toFixed(5) + "," +
+                    classification.category;
+
+                if (seen.has(key)) {
+                    return;
+                }
+
+                seen.add(key);
+
+                places.push({
+                    name: getPlaceName(tags),
+                    lat: coordinates.lat,
+                    lon: coordinates.lon,
+                    classification: classification,
+                    address: [
+                        tags["addr:street"],
+                        tags["addr:suburb"],
+                        tags["addr:city"]
+                    ].filter(Boolean).join(", ")
+                });
+            });
+
+            places.forEach(function (place) {
+                const label = place.classification.label;
+
+                const marker = L.marker([place.lat, place.lon])
+                    .addTo(map)
+                    .bindPopup(
+                        "<strong>" + escapeHtml(place.name) + "</strong><br>" +
+                        escapeHtml(label) + "<br>" +
+                        escapeHtml(place.classification.note)
+                    );
+
+                markers.push(marker);
+            });
+
+            if (places.length > 0) {
+                const group = L.featureGroup(markers);
+                map.fitBounds(group.getBounds().pad(0.15));
+            } else {
+                map.setView([lat, lon], 13);
+            }
+
+            if (searchCenterMarker) {
+                map.removeLayer(searchCenterMarker);
+            }
+
+            searchCenterMarker = L.circleMarker([lat, lon], {
+                radius: 7,
+                color: "#245c45",
+                fillColor: "#8ac6a3",
+                fillOpacity: 0.9
+            })
+                .addTo(map)
+                .bindPopup("Your search area");
+
+            renderCards(places, lat, lon);
+
+            if (places.length === 0) {
+                statusElement.textContent =
+                    "No matching mapped locations were found within approximately 7 km. Try another area or category.";
+            } else {
+                statusElement.textContent =
+                    "Found " + places.length +
+                    " mapped location(s). These are leads, not verified ThreadLoop partners.";
+            }
+        }
+
+        function renderCards(places, lat, lon) {
+            resultsElement.innerHTML = "";
+
+            if (places.length === 0) {
+                resultsElement.innerHTML =
+                    '<div class="empty">No matching locations were found. Map coverage may be incomplete. Try searching another nearby area.</div>';
+                return;
+            }
+
+            places.forEach(function (place) {
+                const card = document.createElement("article");
+                card.className = "place-card";
+
+                const directionsUrl =
+                    "https://www.google.com/maps/dir/?api=1&destination=" +
+                    encodeURIComponent(place.lat + "," + place.lon);
+
+                const addressText = place.address
+                    ? escapeHtml(place.address)
+                    : "Address not provided in map data";
+
+                card.innerHTML = `
+                    <span class="tag warning">
+                        ${escapeHtml(place.classification.label)}
+                    </span>
+                    <h3>${escapeHtml(place.name)}</h3>
+                    <p><strong>Address:</strong> ${addressText}</p>
+                    <p>${escapeHtml(place.classification.note)}</p>
+                    <a class="directions"
+                       href="${directionsUrl}"
+                       target="_blank"
+                       rel="noopener noreferrer">
+                       Get directions →
+                    </a>
+                `;
+
+                resultsElement.appendChild(card);
+            });
+        }
+
+        async function searchPlaces() {
+            const area = areaInput.value.trim();
+            const selected = categoryInput.value;
+
+            if (!area) {
+                statusElement.textContent =
+                    "Please enter an area or city first.";
+                areaInput.focus();
+                return;
+            }
+
+            setLoading(true);
+            statusElement.textContent =
+                "Finding your area and loading nearby map data...";
+
+            try {
+                const location = await geocodeArea(area);
+
+                statusElement.textContent =
+                    "Searching mapped locations near " + area + "...";
+
+                const elements = await fetchPlaces(
+                    location.lat,
+                    location.lon,
+                    selected
+                );
+
+                renderPlaces(
+                    elements,
+                    location.lat,
+                    location.lon,
+                    selected
+                );
+            } catch (error) {
+                statusElement.textContent =
+                    error.message ||
+                    "Something went wrong while searching. Please try again.";
+
+                resultsElement.innerHTML =
+                    '<div class="empty">We could not load the locations this time. Please check your internet connection and try again.</div>';
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function useMyLocation() {
+            if (!navigator.geolocation) {
+                statusElement.textContent =
+                    "Your browser does not support location access. Enter your area manually instead.";
+                return;
+            }
+
+            setLoading(true);
+            statusElement.textContent =
+                "Requesting your location permission...";
+
+            navigator.geolocation.getCurrentPosition(
+                async function (position) {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    const selected = categoryInput.value;
+
+                    try {
+                        statusElement.textContent =
+                            "Searching locations near your current position...";
+
+                        const elements = await fetchPlaces(
+                            lat,
+                            lon,
+                            selected
+                        );
+
+                        renderPlaces(elements, lat, lon, selected);
+
+                        areaInput.value = "My current location";
+                    } catch (error) {
+                        statusElement.textContent =
+                            error.message ||
+                            "Could not load nearby map locations. Please try again.";
+                    } finally {
+                        setLoading(false);
+                    }
+                },
+                function (error) {
+                    const messages = {
+                        1: "Location permission was denied. You can enter your area manually.",
+                        2: "Your location could not be determined. Please try again or enter your area.",
+                        3: "The location request timed out. Please try again."
+                    };
+
+                    statusElement.textContent =
+                        messages[error.code] ||
+                        "Unable to access your location.";
+
+                    setLoading(false);
+                },
+                {
+                    enableHighAccuracy: false,
+                    timeout: 12000,
+                    maximumAge: 60000
+                }
+            );
+        }
+
+        areaInput.addEventListener("keydown", function (event) {
+            if (event.key === "Enter") {
+                searchPlaces();
+            }
+        });
+    </script>
+</body>
+</html>
